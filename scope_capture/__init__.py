@@ -1,27 +1,13 @@
-import inspect
-from types import FunctionType
-
-def _make_cell(value):
-    fn = (lambda x: lambda: x)(value)
-    return fn.__closure__[0]
-
 def capture(f):
-    try:
-        frame = inspect.currentframe()
-        fake_globals = {}
-        fake_globals.update(f.__globals__)
-        fake_globals.update(frame.f_back.f_locals)
-        captured_cells = []
-        if f.__closure__:
-            for cell in f.__closure__:
-                captured_cells.append(_make_cell(cell.cell_contents))
-        call_fn = FunctionType(
-            code=f.__code__,
-            globals=fake_globals,
-            name=f.__name__,
-            argdefs=f.__defaults__,
-            closure=tuple(captured_cells),
+    return type(f)(
+        code=f.__code__,
+        argdefs=f.__defaults__,
+        globals={
+            k: f.__globals__[k] 
+            for k in f.__globals__.keys() & f.__code__.co_names
+        },
+        closure=tuple(
+            (lambda x: lambda: x)(c.cell_contents).__closure__[0]
+            for c in f.__closure__ or ()
         )
-        return call_fn
-    finally:
-        del frame
+    )
